@@ -1,5 +1,6 @@
-use rapina::extract::State;
+use rapina::extract::{FromRequestParts, State};
 use rapina::prelude::*;
+use std::sync::Arc;
 
 #[derive(Clone)]
 struct AppConfig {
@@ -12,11 +13,34 @@ struct CreateUser {
     email: String,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Clone)]
 struct User {
     id: u64,
     name: String,
     email: String,
+}
+
+struct CurrentUser {
+    user_id: u64,
+}
+
+impl FromRequestParts for CurrentUser {
+    async fn from_request_parts(
+        parts: &http::request::Parts,
+        _params: &rapina::extract::PathParams,
+        _state: &Arc<rapina::state::AppState>,
+    ) -> rapina::error::Result<Self> {
+        let user_id = parts
+            .headers
+            .get("x-user-id")
+            .and_then(|v| v.to_str().ok())
+            .and_then(|v| v.parse().ok())
+            .ok_or_else(|| {
+                rapina::error::Error::unauthorized("missing or invalid x-user-id header")
+            })?;
+
+        Ok(CurrentUser { user_id })
+    }
 }
 
 #[get("/")]
@@ -48,6 +72,15 @@ async fn get_user(id: Path<u64>) -> Result<Json<User>> {
     }))
 }
 
+#[get("/me")]
+async fn get_me(user: CurrentUser) -> Json<User> {
+    Json(User {
+        id: user.user_id,
+        name: "Current User".to_string(),
+        email: "me@example.com".to_string(),
+    })
+}
+
 #[post("/users")]
 async fn create_user(body: Json<CreateUser>) -> Json<User> {
     let input = body.into_inner();
@@ -68,6 +101,7 @@ async fn main() -> std::io::Result<()> {
         .get("/", hello)
         .get("/health", health)
         .get("/users/:id", get_user)
+        .get("/me", get_me)
         .post("/users", create_user);
 
     Rapina::new()

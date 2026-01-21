@@ -57,7 +57,10 @@ fn route_macro_core(
 
                 arg_names.push(arg_name.clone());
                 extractions.push(quote! {
-                        let #arg_name = <#arg_type as rapina::extract::FromRequest>::from_request(req, &params, &state).await.unwrap();
+                        let #arg_name = match <#arg_type as rapina::extract::FromRequest>::from_request(req, &params, &state).await {
+                            Ok(v) => v,
+                            Err(e) => return rapina::response::IntoResponse::into_response(e),
+                    };
                     });
             }
         }
@@ -69,9 +72,9 @@ fn route_macro_core(
                 req: hyper::Request<hyper::body::Incoming>,
                 params: rapina::extract::PathParams,
                 state: std::sync::Arc<rapina::state::AppState>,
-            ) #func_output {
+            ) -> hyper::Response<http_body_util::Full<hyper::body::Bytes>> {
                 #(#extractions)*
-                #inner_block
+                rapina::response::IntoResponse::into_response((|| async #inner_block)().await)
             }
         }
     }

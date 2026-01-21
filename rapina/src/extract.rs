@@ -25,6 +25,14 @@ pub trait FromRequest: Sized {
     ) -> impl std::future::Future<Output = Result<Self, Error>> + Send;
 }
 
+pub trait FromRequestParts: Sized + Send {
+    fn from_request_parts(
+        parts: &http::request::Parts,
+        params: &PathParams,
+        state: &Arc<AppState>,
+    ) -> impl std::future::Future<Output = Result<Self, Error>> + Send;
+}
+
 impl<T> Json<T> {
     pub fn into_inner(self) -> T {
         self.0
@@ -74,12 +82,25 @@ impl<T: serde::Serialize> IntoResponse for Json<T> {
     }
 }
 
-impl<T: FromStr + Send> FromRequest for Path<T>
+impl<T: Clone + Send + Sync + 'static> FromRequestParts for State<T> {
+    async fn from_request_parts(
+        _parts: &http::request::Parts,
+        _params: &PathParams,
+        state: &Arc<AppState>,
+    ) -> Result<Self, Error> {
+        let value = state
+            .get::<T>()
+            .ok_or_else(|| Error::internal("state not found"))?;
+        Ok(State(value.clone()))
+    }
+}
+
+impl<T: FromStr + Send> FromRequestParts for Path<T>
 where
     T::Err: std::fmt::Display,
 {
-    async fn from_request(
-        _req: Request<Incoming>,
+    async fn from_request_parts(
+        _parts: &http::request::Parts,
         params: &PathParams,
         _state: &Arc<AppState>,
     ) -> Result<Self, Error> {
@@ -96,17 +117,14 @@ where
     }
 }
 
-impl<T: Clone + Send + Sync + 'static> FromRequest for State<T> {
+impl<T: FromRequestParts> FromRequest for T {
     async fn from_request(
-        _req: Request<Incoming>,
-        _params: &PathParams,
+        req: Request<Incoming>,
+        params: &PathParams,
         state: &Arc<AppState>,
     ) -> Result<Self, Error> {
-        let value = state
-            .get::<T>()
-            .ok_or_else(|| Error::internal("state not found"))?;
-
-        Ok(State(value.clone()))
+        let (parts, _body) = req.into_parts();
+        Self::from_request_parts(&parts, params, state).await
     }
 }
 
