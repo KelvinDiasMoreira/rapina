@@ -36,11 +36,12 @@ fn route_macro_core(
 
     let args: Vec<_> = func.sig.inputs.iter().collect();
 
-    let expanded = if args.is_empty() {
+    if args.is_empty() {
         quote! {
             #func_vis async fn #func_name(
-                _req: hyper::Request<hyper::body::Incoming>,
-                _params: rapina::extract::PathParams,
+                req: hyper::Request<hyper::body::Incoming>,
+                params: rapina::extract::PathParams,
+                state: std::sync::Arc<rapina::state::AppState>,
             ) #func_output #func_block
         }
     } else {
@@ -48,16 +49,16 @@ fn route_macro_core(
         let mut arg_names = Vec::new();
 
         for arg in &args {
-            if let FnArg::Typed(pat_type) = arg {
-                if let Pat::Ident(pat_ident) = &*pat_type.pat {
-                    let arg_name = &pat_ident.ident;
-                    let arg_type = &pat_type.ty;
+            if let FnArg::Typed(pat_type) = arg
+                && let Pat::Ident(pat_ident) = &*pat_type.pat
+            {
+                let arg_name = &pat_ident.ident;
+                let arg_type = &pat_type.ty;
 
-                    arg_names.push(arg_name.clone());
-                    extractions.push(quote! {
-                        let #arg_name = <#arg_type as rapina::extract::FromRequest>::from_request(req, &params).await.unwrap();
+                arg_names.push(arg_name.clone());
+                extractions.push(quote! {
+                        let #arg_name = <#arg_type as rapina::extract::FromRequest>::from_request(req, &params, &state).await.unwrap();
                     });
-                }
             }
         }
 
@@ -67,14 +68,13 @@ fn route_macro_core(
             #func_vis async fn #func_name(
                 req: hyper::Request<hyper::body::Incoming>,
                 params: rapina::extract::PathParams,
+                state: std::sync::Arc<rapina::state::AppState>,
             ) #func_output {
                 #(#extractions)*
                 #inner_block
             }
         }
-    };
-
-    expanded
+    }
 }
 
 fn route_macro(attr: TokenStream, item: TokenStream) -> TokenStream {

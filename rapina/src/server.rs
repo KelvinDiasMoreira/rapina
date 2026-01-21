@@ -7,9 +7,11 @@ use hyper_util::rt::TokioIo;
 use tokio::net::TcpListener;
 
 use crate::router::Router;
+use crate::state::AppState;
 
-pub async fn serve(router: Router, addr: SocketAddr) -> std::io::Result<()> {
+pub async fn serve(router: Router, state: AppState, addr: SocketAddr) -> std::io::Result<()> {
     let router = Arc::new(router);
+    let state = Arc::new(state);
     let listener = TcpListener::bind(addr).await?;
 
     println!("Rapina listening on http://{}", addr);
@@ -18,11 +20,13 @@ pub async fn serve(router: Router, addr: SocketAddr) -> std::io::Result<()> {
         let (stream, _) = listener.accept().await?;
         let io = TokioIo::new(stream);
         let router = router.clone();
+        let state = state.clone();
 
         tokio::spawn(async move {
             let service = service_fn(move |req| {
                 let router = router.clone();
-                async move { Ok::<_, std::convert::Infallible>(router.handle(req).await) }
+                let state = state.clone();
+                async move { Ok::<_, std::convert::Infallible>(router.handle(req, &state).await) }
             });
 
             if let Err(e) = http1::Builder::new().serve_connection(io, service).await {

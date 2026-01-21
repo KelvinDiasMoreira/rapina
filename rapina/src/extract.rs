@@ -5,12 +5,15 @@ use hyper::body::Incoming;
 use serde::de::DeserializeOwned;
 use std::collections::HashMap;
 use std::str::FromStr;
+use std::sync::Arc;
 
 use crate::error::Error;
 use crate::response::{BoxBody, IntoResponse};
+use crate::state::AppState;
 
 pub struct Json<T>(pub T);
 pub struct Path<T>(pub T);
+pub struct State<T>(pub T);
 
 pub type PathParams = HashMap<String, String>;
 
@@ -18,6 +21,7 @@ pub trait FromRequest: Sized {
     fn from_request(
         req: Request<Incoming>,
         params: &PathParams,
+        state: &Arc<AppState>,
     ) -> impl std::future::Future<Output = Result<Self, Error>> + Send;
 }
 
@@ -33,8 +37,18 @@ impl<T> Path<T> {
     }
 }
 
+impl<T> State<T> {
+    pub fn into_inner(self) -> T {
+        self.0
+    }
+}
+
 impl<T: DeserializeOwned + Send> FromRequest for Json<T> {
-    async fn from_request(req: Request<Incoming>, _params: &PathParams) -> Result<Self, Error> {
+    async fn from_request(
+        req: Request<Incoming>,
+        _params: &PathParams,
+        _state: &Arc<AppState>,
+    ) -> Result<Self, Error> {
         let body = req.into_body();
         let bytes = body
             .collect()
@@ -64,7 +78,11 @@ impl<T: FromStr + Send> FromRequest for Path<T>
 where
     T::Err: std::fmt::Display,
 {
-    async fn from_request(_req: Request<Incoming>, params: &PathParams) -> Result<Self, Error> {
+    async fn from_request(
+        _req: Request<Incoming>,
+        params: &PathParams,
+        _state: &Arc<AppState>,
+    ) -> Result<Self, Error> {
         let value = params
             .values()
             .next()
@@ -75,6 +93,20 @@ where
             .map_err(|e| Error::bad_request(format!("invalid path param: {}", e)))?;
 
         Ok(Path(parsed))
+    }
+}
+
+impl<T: Clone + Send + Sync + 'static> FromRequest for State<T> {
+    async fn from_request(
+        _req: Request<Incoming>,
+        _params: &PathParams,
+        state: &Arc<AppState>,
+    ) -> Result<Self, Error> {
+        let value = state
+            .get::<T>()
+            .ok_or_else(|| Error::internal("state not found"))?;
+
+        Ok(State(value.clone()))
     }
 }
 

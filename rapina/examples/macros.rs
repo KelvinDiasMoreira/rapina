@@ -1,4 +1,10 @@
+use rapina::extract::State;
 use rapina::prelude::*;
+
+#[derive(Clone)]
+struct AppConfig {
+    app_name: String,
+}
 
 #[derive(Deserialize)]
 struct CreateUser {
@@ -14,8 +20,8 @@ struct User {
 }
 
 #[get("/")]
-async fn hello() -> &'static str {
-    "Hello, Rapina!"
+async fn hello(config: State<AppConfig>) -> String {
+    format!("Hello from {}!", config.into_inner().app_name)
 }
 
 #[get("/health")]
@@ -54,11 +60,19 @@ async fn create_user(body: Json<CreateUser>) -> Json<User> {
 
 #[tokio::main]
 async fn main() -> std::io::Result<()> {
+    let config = AppConfig {
+        app_name: "Rapina Demo".to_string(),
+    };
+
     let router = Router::new()
         .get("/", hello)
         .get("/health", health)
         .get("/users/:id", get_user)
         .post("/users", create_user);
 
-    Rapina::new().router(router).listen("127.0.0.1:3000").await
+    Rapina::new()
+        .state(config)
+        .router(router)
+        .listen("127.0.0.1:3000")
+        .await
 }
