@@ -45,7 +45,8 @@ fn route_macro_core(
             ) #func_output #func_block
         }
     } else {
-        let mut extractions = Vec::new();
+        let mut parts_extractions = Vec::new();
+        let mut body_extractors: Vec<(syn::Ident, Box<syn::Type>)> = Vec::new();
         let mut arg_names = Vec::new();
 
         for arg in &args {
@@ -56,14 +57,41 @@ fn route_macro_core(
                 let arg_type = &pat_type.ty;
 
                 arg_names.push(arg_name.clone());
-                extractions.push(quote! {
-                        let #arg_name = match <#arg_type as rapina::extract::FromRequest>::from_request(req, &params, &state).await {
+
+                // Check if this is a parts-only extractor
+                let type_str = quote!(#arg_type).to_string();
+                if is_parts_only_extractor(&type_str) {
+                    parts_extractions.push(quote! {
+                        let #arg_name = match <#arg_type as rapina::extract::FromRequestParts>::from_request_parts(&parts, &params, &state).await {
                             Ok(v) => v,
                             Err(e) => return rapina::response::IntoResponse::into_response(e),
-                    };
+                        };
                     });
+                } else {
+                    body_extractors.push((arg_name.clone(), arg_type.clone()));
+                }
             }
         }
+
+        // Generate body extraction code - only one body extractor is allowed
+        let body_extraction = if body_extractors.is_empty() {
+            quote! {}
+        } else if body_extractors.len() == 1 {
+            let (arg_name, arg_type) = &body_extractors[0];
+            quote! {
+                let req = http::Request::from_parts(parts, body);
+                let #arg_name = match <#arg_type as rapina::extract::FromRequest>::from_request(req, &params, &state).await {
+                    Ok(v) => v,
+                    Err(e) => return rapina::response::IntoResponse::into_response(e),
+                };
+            }
+        } else {
+            let names: Vec<_> = body_extractors.iter().map(|(n, _)| n.to_string()).collect();
+            panic!(
+                "Multiple body-consuming extractors are not supported: {}. Only one extractor can consume the request body.",
+                names.join(", ")
+            );
+        };
 
         let inner_block = &func.block;
 
@@ -73,11 +101,19 @@ fn route_macro_core(
                 params: rapina::extract::PathParams,
                 state: std::sync::Arc<rapina::state::AppState>,
             ) -> hyper::Response<http_body_util::Full<hyper::body::Bytes>> {
-                #(#extractions)*
+                let (parts, body) = req.into_parts();
+                #(#parts_extractions)*
+                #body_extraction
                 rapina::response::IntoResponse::into_response((|| async #inner_block)().await)
             }
         }
     }
+}
+
+fn is_parts_only_extractor(type_str: &str) -> bool {
+    type_str.contains("Path")
+        || type_str.contains("State")
+        || type_str.contains("Context")
 }
 
 fn route_macro(attr: TokenStream, item: TokenStream) -> TokenStream {
@@ -156,6 +192,54 @@ mod tests {
         let body_str = quote!(#output_func.block).to_string();
         assert!(body_str.contains("id"));
         assert!(body_str.contains("body"));
+
+        // Check that parts-only extractor uses FromRequestParts
+        assert!(body_str.contains("FromRequestParts"));
+        // Check that body extractor uses FromRequest
+        assert!(body_str.contains("FromRequest"));
+    }
+
+    #[test]
+    fn test_parts_extractors_before_body() {
+        let path = quote!("/users/:id");
+        let input = quote! {
+            async fn handler(
+                ctx: rapina::extract::Context,
+                id: rapina::extract::Path<u64>,
+                state: rapina::extract::State<Config>,
+                body: rapina::extract::Json<Data>
+            ) -> String {
+                "ok".to_string()
+            }
+        };
+
+        let output = route_macro_core(path, input);
+        let body_str = output.to_string();
+
+        // Verify request is split into parts and body
+        assert!(body_str.contains("into_parts"));
+
+        // Verify parts extractors use FromRequestParts
+        assert!(body_str.contains("FromRequestParts"));
+
+        // Verify body extractor reconstructs request
+        assert!(body_str.contains("from_parts"));
+    }
+
+    #[test]
+    #[should_panic(expected = "Multiple body-consuming extractors are not supported")]
+    fn test_multiple_body_extractors_panics() {
+        let path = quote!("/users");
+        let input = quote! {
+            async fn handler(
+                body1: rapina::extract::Json<String>,
+                body2: rapina::extract::Json<String>
+            ) -> String {
+                "ok".to_string()
+            }
+        };
+
+        route_macro_core(path, input);
     }
 
     #[test]
