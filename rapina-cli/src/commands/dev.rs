@@ -55,7 +55,7 @@ pub fn execute(config: DevConfig) -> Result<(), String> {
             move |res: DebounceEventResult| {
                 if let Ok(events) = res {
                     for event in events {
-                        if event.path.extension().map_or(false, |ext| ext == "rs") {
+                        if event.path.extension().is_some_and(|ext| ext == "rs") {
                             let _ = tx.send(());
                             break;
                         }
@@ -100,14 +100,14 @@ pub fn execute(config: DevConfig) -> Result<(), String> {
             }
 
             // Check if server process has exited unexpectedly
-            if let Ok(Some(status)) = server_process.try_wait() {
-                if !status.success() {
-                    eprintln!(
-                        "{} Server exited with status: {}",
-                        "ERROR".bright_red(),
-                        status
-                    );
-                }
+            if let Ok(Some(status)) = server_process.try_wait()
+                && !status.success()
+            {
+                eprintln!(
+                    "{} Server exited with status: {}",
+                    "ERROR".bright_red(),
+                    status
+                );
                 // Wait for file change before trying to restart
             }
         }
@@ -217,12 +217,11 @@ fn get_binary_name() -> Result<String, String> {
         .map_err(|e| format!("Failed to parse Cargo.toml: {}", e))?;
 
     // Check for [[bin]] section first
-    if let Some(bins) = parsed.get("bin").and_then(|b| b.as_array()) {
-        if let Some(first_bin) = bins.first() {
-            if let Some(name) = first_bin.get("name").and_then(|n| n.as_str()) {
-                return Ok(name.to_string());
-            }
-        }
+    if let Some(bins) = parsed.get("bin").and_then(|b| b.as_array())
+        && let Some(first_bin) = bins.first()
+        && let Some(name) = first_bin.get("name").and_then(|n| n.as_str())
+    {
+        return Ok(name.to_string());
     }
 
     // Fall back to package name
