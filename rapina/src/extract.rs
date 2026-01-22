@@ -6,6 +6,7 @@ use serde::de::DeserializeOwned;
 use std::collections::HashMap;
 use std::str::FromStr;
 use std::sync::Arc;
+use validator::Validate;
 
 use crate::context::RequestContext;
 use crate::error::Error;
@@ -26,6 +27,8 @@ pub struct Headers(pub http::HeaderMap);
 pub struct State<T>(pub T);
 #[derive(Debug)]
 pub struct Context(pub RequestContext);
+#[derive(Debug)]
+pub struct Validated<T>(pub T);
 
 pub type PathParams = HashMap<String, String>;
 
@@ -99,6 +102,12 @@ impl Context {
     }
 }
 
+impl<T> Validated<T> {
+    pub fn into_inner(self) -> T {
+        self.0
+    }
+}
+
 impl<T: DeserializeOwned + Send> FromRequest for Json<T> {
     async fn from_request(
         req: Request<Incoming>,
@@ -161,6 +170,36 @@ impl<T: DeserializeOwned + Send> FromRequest for Form<T> {
             .map_err(|e| Error::bad_request(format!("invalid form data: {}", e)))?;
 
         Ok(Form(value))
+    }
+}
+
+impl<T: DeserializeOwned + Validate + Send> FromRequest for Validated<Json<T>> {
+    async fn from_request(
+        req: Request<Incoming>,
+        params: &PathParams,
+        state: &Arc<AppState>,
+    ) -> Result<Self, Error> {
+        let json = Json::<T>::from_request(req, params, state).await?;
+        json.0.validate().map_err(|e| {
+            Error::validation("validation failed")
+                .with_details(serde_json::to_value(e).unwrap_or_default())
+        })?;
+        Ok(Validated(json))
+    }
+}
+
+impl<T: DeserializeOwned + Validate + Send> FromRequest for Validated<Form<T>> {
+    async fn from_request(
+        req: Request<Incoming>,
+        params: &PathParams,
+        state: &Arc<AppState>,
+    ) -> Result<Self, Error> {
+        let form = Form::<T>::from_request(req, params, state).await?;
+        form.0.validate().map_err(|e| {
+            Error::validation("validation failed")
+                .with_details(serde_json::to_value(e).unwrap_or_default())
+        })?;
+        Ok(Validated(form))
     }
 }
 
@@ -560,5 +599,29 @@ mod tests {
         let context = Context(ctx);
         // Verify elapsed() returns a Duration (compile-time check)
         let _elapsed: std::time::Duration = context.elapsed();
+    }
+
+    #[test]
+    fn test_validated_into_inner() {
+        let validated = Validated("value".to_string());
+        assert_eq!(validated.into_inner(), "value");
+    }
+
+    #[test]
+    fn test_validated_with_struct() {
+        #[derive(Debug, PartialEq)]
+        struct Data {
+            name: String,
+        }
+
+        let validated = Validated(Data {
+            name: "test".to_string(),
+        });
+        assert_eq!(
+            validated.into_inner(),
+            Data {
+                name: "test".to_string()
+            }
+        );
     }
 }

@@ -14,13 +14,14 @@ pub mod prelude {
     pub use crate::app::Rapina;
     pub use crate::context::RequestContext;
     pub use crate::error::{Error, Result};
-    pub use crate::extract::{Context, Form, Headers, Json, Path, Query};
+    pub use crate::extract::{Context, Form, Headers, Json, Path, Query, Validated};
     pub use crate::middleware::{Middleware, Next};
     pub use crate::response::IntoResponse;
     pub use crate::router::Router;
 
     pub use http::{Method, StatusCode};
     pub use serde::{Deserialize, Serialize};
+    pub use validator::Validate;
 
     pub use rapina_macros::{delete, get, post, put};
 }
