@@ -188,7 +188,7 @@ rapina doctor              # Health checks
 
 ## Documentation
 
-Full documentation available at [rapina.dev](https://userapina.com/)
+Full documentation available at [userapina.com](https://userapina.com/)
 
 - [Getting Started](https://userapina.com/guide/getting-started/)
 - [Configuration](https://userapina.com/guide/configuration/)
