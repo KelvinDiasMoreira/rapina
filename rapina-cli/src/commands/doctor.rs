@@ -13,10 +13,15 @@ struct DiagnosticResult {
     passed: Vec<String>,
 }
 
+pub struct DoctorConfig {
+    pub host: String,
+    pub port: u16,
+}
+
 /// Run health checks on the API.
-pub fn execute() -> Result<(), String> {
+pub fn execute(config: DoctorConfig) -> Result<(), String> {
     println!();
-    println!("  {} Running API health checks...", "→".cyan());
+    println!("  {} Running API health checks on host: {} and port: {}", "→".cyan(), config.host, config.port);
     println!();
 
     let routes = fetch_json(ROUTES_URL)?;
