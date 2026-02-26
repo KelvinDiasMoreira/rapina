@@ -185,12 +185,8 @@ fn main() {
                 std::process::exit(1);
             }
         }
-        Some(Commands::Doctor {host, port}) => {
-            println!("host: {}, port: {}", host, port);
-            let config = commands::doctor::DoctorConfig {
-                host,
-                port
-            };
+        Some(Commands::Doctor { host, port }) => {
+            let config = commands::doctor::DoctorConfig { host, port };
             if let Err(e) = commands::doctor::execute(config) {
                 eprintln!("{} {}", "Error:".red().bold(), e);
                 std::process::exit(1);

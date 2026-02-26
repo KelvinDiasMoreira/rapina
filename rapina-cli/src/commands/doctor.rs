@@ -4,9 +4,6 @@ use colored::Colorize;
 use serde_json::Value;
 use std::process::Command;
 
-const ROUTES_URL: &str = "http://127.0.0.1:3000/__rapina/routes";
-const OPENAPI_URL: &str = "http://127.0.0.1:3000/__rapina/openapi.json";
-
 struct DiagnosticResult {
     warnings: Vec<String>,
     errors: Vec<String>,
@@ -21,11 +18,16 @@ pub struct DoctorConfig {
 /// Run health checks on the API.
 pub fn execute(config: DoctorConfig) -> Result<(), String> {
     println!();
-    println!("  {} Running API health checks on host: {} and port: {}", "→".cyan(), config.host, config.port);
+    println!(
+        "  {} Running API health checks on host: {} and port: {}",
+        "→".cyan(),
+        config.host,
+        config.port
+    );
     println!();
 
-    let routes = fetch_json(ROUTES_URL)?;
-    let openapi = fetch_json(OPENAPI_URL);
+    let routes = fetch_json(&build_routes_url(&config))?;
+    let openapi = fetch_json(&build_openapi_url(&config));
 
     let mut result = DiagnosticResult {
         warnings: Vec::new(),
@@ -218,4 +220,17 @@ fn fetch_json(url: &str) -> Result<Value, String> {
         String::from_utf8(output.stdout).map_err(|e| format!("Invalid UTF-8 response: {}", e))?;
 
     serde_json::from_str(&body).map_err(|e| format!("Invalid JSON response: {}", e))
+}
+
+fn build_routes_url(config: &DoctorConfig) -> String {
+    // example -> "http://127.0.0.1:3000/__rapina/routes"
+    format!("http://{}:{}/__rapina/routes", config.host, config.port)
+}
+
+fn build_openapi_url(config: &DoctorConfig) -> String {
+    // example -> "http://127.0.0.1:3000/__rapina/openapi.json"
+    format!(
+        "http://{}:{}/__rapina/openapi.json",
+        config.host, config.port
+    )
 }
