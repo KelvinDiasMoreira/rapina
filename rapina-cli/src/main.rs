@@ -30,7 +30,7 @@ enum Commands {
     /// Start development server with hot reload
     Dev {
         /// Port to listen on
-        #[arg(short, long, default_value = "3000")]
+        #[arg(short, long, env = "RAPINA_PORT", default_value = "3000")]
         port: u16,
         /// Host to bind to
         #[arg(long, default_value = "127.0.0.1")]
@@ -47,7 +47,7 @@ enum Commands {
     /// List all registered routes
     Routes {
         /// Port to listen on
-        #[arg(short, long, default_value = "3000")]
+        #[arg(short, long, env = "RAPINA_PORT", default_value = "3000")]
         port: u16,
         /// Host to bind to
         #[arg(long, default_value = "127.0.0.1")]
@@ -61,7 +61,7 @@ enum Commands {
     /// Run health checks on your API
     Doctor {
         /// Port to listen on
-        #[arg(short, long, default_value = "3000")]
+        #[arg(short, long, env = "RAPINA_PORT", default_value = "3000")]
         port: u16,
         /// Host to bind to
         #[arg(long, default_value = "127.0.0.1")]

@@ -16,7 +16,7 @@ name = "rapina"
 path = "src/main.rs"
 
 [dependencies]
-clap = { version = "4", features = ["derive"] }
+clap = { version = "4", features = ["derive", "env"] }
 colored = "3"
 notify = { version = "8", default-features = false, features = [
   "macos_kqueue",
