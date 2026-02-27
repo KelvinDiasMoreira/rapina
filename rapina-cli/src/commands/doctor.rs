@@ -19,7 +19,7 @@ pub struct DoctorConfig {
 pub fn execute(config: DoctorConfig) -> Result<(), String> {
     println!();
     println!(
-        "  {} Running API health checks on host: {} and port: {}",
+        "  {} Running API health checks on http://{}:{}...",
         "→".cyan(),
         config.host,
         config.port
@@ -223,12 +223,10 @@ fn fetch_json(url: &str) -> Result<Value, String> {
 }
 
 fn build_routes_url(config: &DoctorConfig) -> String {
-    // example -> "http://127.0.0.1:3000/__rapina/routes"
     format!("http://{}:{}/__rapina/routes", config.host, config.port)
 }
 
 fn build_openapi_url(config: &DoctorConfig) -> String {
-    // example -> "http://127.0.0.1:3000/__rapina/openapi.json"
     format!(
         "http://{}:{}/__rapina/openapi.json",
         config.host, config.port
