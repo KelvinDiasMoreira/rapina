@@ -1,5 +1,6 @@
 //! Health checks for your Rapina API.
 
+use crate::common::urls;
 use colored::Colorize;
 use serde_json::Value;
 use std::process::Command;
@@ -26,8 +27,8 @@ pub fn execute(config: DoctorConfig) -> Result<(), String> {
     );
     println!();
 
-    let routes = fetch_json(&build_routes_url(&config))?;
-    let openapi = fetch_json(&build_openapi_url(&config));
+    let routes = fetch_json(&urls::build_routes_url(&config.host, &config.port))?;
+    let openapi = fetch_json(&urls::build_openapi_url(&config.host, &config.port));
 
     let mut result = DiagnosticResult {
         warnings: Vec::new(),
@@ -220,15 +221,4 @@ fn fetch_json(url: &str) -> Result<Value, String> {
         String::from_utf8(output.stdout).map_err(|e| format!("Invalid UTF-8 response: {}", e))?;
 
     serde_json::from_str(&body).map_err(|e| format!("Invalid JSON response: {}", e))
-}
-
-fn build_routes_url(config: &DoctorConfig) -> String {
-    format!("http://{}:{}/__rapina/routes", config.host, config.port)
-}
-
-fn build_openapi_url(config: &DoctorConfig) -> String {
-    format!(
-        "http://{}:{}/__rapina/openapi.json",
-        config.host, config.port
-    )
 }
