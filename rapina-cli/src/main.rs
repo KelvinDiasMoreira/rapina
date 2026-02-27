@@ -2,6 +2,7 @@
 
 mod colors;
 mod commands;
+mod common;
 
 use clap::{Parser, Subcommand};
 use colored::Colorize;
@@ -44,7 +45,14 @@ enum Commands {
         command: OpenapiCommands,
     },
     /// List all registered routes
-    Routes,
+    Routes {
+        /// Port to listen on
+        #[arg(short, long, default_value = "3000")]
+        port: u16,
+        /// Host to bind to
+        #[arg(long, default_value = "127.0.0.1")]
+        host: String,
+    },
     /// Database migration tools
     Migrate {
         #[command(subcommand)]
@@ -179,8 +187,9 @@ fn main() {
                 std::process::exit(1);
             }
         }
-        Some(Commands::Routes) => {
-            if let Err(e) = commands::routes::execute() {
+        Some(Commands::Routes { host, port }) => {
+            let config = commands::routes::RoutesConfig { host, port };
+            if let Err(e) = commands::routes::execute(config) {
                 eprintln!("{} {}", "Error:".red().bold(), e);
                 std::process::exit(1);
             }
