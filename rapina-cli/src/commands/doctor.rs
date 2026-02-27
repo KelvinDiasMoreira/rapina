@@ -27,7 +27,7 @@ pub fn execute(config: DoctorConfig) -> Result<(), String> {
     );
     println!();
 
-    let routes = fetch_json(&urls::build_routes_url(&config.host, &config.port))?;
+    let routes = fetch_json(&urls::build_routes_url(&config.host, config.port))?;
     let openapi = fetch_json(&urls::build_openapi_url(&config.host, config.port));
 
     let mut result = DiagnosticResult {
