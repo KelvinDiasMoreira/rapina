@@ -1,6 +1,6 @@
 [package]
 name = "rapina-cli"
-version = "0.6.0"
+version = "0.7.3"
 edition = "2024"
 rust-version = "1.85"
 description = "CLI tool for Rapina web framework - create and run Rapina projects"
@@ -27,3 +27,37 @@ toml = "1.0"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 chrono = "0.4"
+tokio = { version = "1", features = ["full"], optional = true }
+sea-schema = { version = "0.16", optional = true, default-features = false }
+sqlx = { version = "0.8", optional = true }
+
+[features]
+default = []
+import = ["tokio"]
+import-postgres = [
+    "import",
+    "sea-schema/postgres",
+    "sea-schema/discovery",
+    "sea-schema/runtime-tokio-rustls",
+    "sea-schema/sqlx-postgres",
+    "sqlx/runtime-tokio-rustls",
+    "sqlx/postgres",
+]
+import-mysql = [
+    "import",
+    "sea-schema/mysql",
+    "sea-schema/discovery",
+    "sea-schema/runtime-tokio-rustls",
+    "sea-schema/sqlx-mysql",
+    "sqlx/runtime-tokio-rustls",
+    "sqlx/mysql",
+]
+import-sqlite = [
+    "import",
+    "sea-schema/sqlite",
+    "sea-schema/discovery",
+    "sea-schema/runtime-tokio-rustls",
+    "sea-schema/sqlx-sqlite",
+    "sqlx/runtime-tokio-rustls",
+    "sqlx/sqlite",
+]

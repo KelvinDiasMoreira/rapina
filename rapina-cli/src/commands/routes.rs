@@ -26,7 +26,7 @@ pub fn execute(config: RoutesConfig) -> Result<(), String> {
         config.host,
         config.port
     );
-    let routes = fetch_routes(&urls::build_routes_url(&config.host, &config.port))?;
+    let routes = fetch_routes(&urls::build_routes_url(&config.host, config.port))?;
 
     if routes.is_empty() {
         println!("  {} No routes registered", "⚠".yellow());
